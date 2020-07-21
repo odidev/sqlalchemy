@@ -25,46 +25,13 @@ jobs:
       matrix:
         os:
           - "ubuntu-latest"
-          - "windows-latest"
-          - "macos-latest"
         python-version:
-          - "2.7"
-          - "3.5"
-          - "3.6"
-          - "3.7"
           - "3.8"
         build-type:
           - "cext"
           - "nocext"
         architecture:
           - x64
-          - x86
-
-        include:
-          # the mock reconnect test seems to fail on the ci in windows
-          - os: "windows-latest"
-            pytest-args: "-k 'not MockReconnectTest'"
-          # python 2.7 or 3.5 on windows seem to fail also test_hanging_connect_within_overflow
-          - os: "windows-latest"
-            python-version: "3.5"
-            pytest-args: "-k 'not MockReconnectTest and not test_hanging_connect_within_overflow'"
-          - os: "windows-latest"
-            python-version: "2.7"
-            pytest-args: "-k 'not MockReconnectTest and not test_hanging_connect_within_overflow'"
-
-        exclude:
-          # c-extensions fail to build on windows for python 3.5 and 2.7
-          - os: "windows-latest"
-            python-version: "2.7"
-            build-type: "cext"
-          - os: "windows-latest"
-            python-version: "3.5"
-            build-type: "cext"
-          # linux and osx do not have x86 python
-          - os: "ubuntu-latest"
-            architecture: x86
-          - os: "macos-latest"
-            architecture: x86
 
       fail-fast: false
 
