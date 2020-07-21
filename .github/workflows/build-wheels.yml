@@ -1,0 +1,136 @@
+# This workflows will upload a Python Package using Twine when a release is created
+# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
+
+name: Upload Python Package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  make-wheel-linux:
+    name: ${{ matrix.python-version }}-${{ matrix.architecture }}-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - "ubuntu-latest"
+        python-version:
+          # the versions are <python tag>-<abi tag> as specified in PEP 425.
+          - cp27-cp27m
+          - cp27-cp27mu
+          - cp35-cp35m
+          - cp36-cp36m
+          - cp37-cp37m
+          - cp38-cp38
+        architecture:
+          - x64
+
+        include:
+          - python-version: "cp27-cp27m"
+            extra-requires: "mock"
+          - python-version: "cp27-cp27mu"
+            extra-requires: "mock"
+
+      fail-fast: false
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      
+      - name: Get python version
+        id: linux-py-version
+        env:
+          py_tag: ${{ matrix.python-version }}
+        # the command `echo "::set-output ...` is used to create an step output that can be used in following steps
+        # this is from https://github.community/t5/GitHub-Actions/Using-the-output-of-run-inside-of-if-condition/td-p/33920
+        run: |
+          version="${py_tag: 2:1}.${py_tag: 3:1}"
+          echo $version
+          echo "::set-output name=python-version::$version"
+
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{  steps.linux-py-version.outputs.python-version }}
+          architecture: ${{ matrix.architecture }}
+
+      - name: Remove tag_build from setup.cfg
+        # sqlalchemy has `tag_build` set to `dev` in setup.cfg. We need to remove it before creating the weel
+        # otherwise it gets tagged with `dev0`
+        shell: pwsh
+        # This is equivalent to the sed commands:
+        # `sed -i '/tag_build=dev/d' setup.cfg`
+        # `sed -i '/tag_build = dev/d' setup.cfg`
+
+        # `-replace` uses a regexp match
+        # alternative form: `(get-content setup.cfg) | foreach-object{$_ -replace "tag_build.=.dev",""} | set-content setup.cfg`
+        run: |
+          (cat setup.cfg) | %{$_ -replace "tag_build.?=.?dev",""} | set-content setup.cfg
+
+      - name: Create wheel for manylinux
+        # this step uses the image provided by pypa here https://github.com/pypa/manylinux to generate the wheels on linux
+        # the action uses the image for manylinux2010 but can generate also a manylinux1 wheel
+        # change the tag of this image to change the image used
+        # NOTE: the output folder is "wheelhouse", not the classic "dist"
+        uses: RalfG/python-wheels-manylinux-build@v0.2.2-manylinux2010_x86_64
+        # this action generates 3 wheels in wheelhouse/. linux, manylinux1 and manylinux2010
+        with:
+          # python-versions is the output of the previous step and is in the form <python tag>-<abi tag>. Eg cp37-cp37mu
+          python-versions: ${{ matrix.python-version }}
+          build-requirements: "setuptools wheel"
+          # Create the wheel using --no-use-pep517 since locally we have pyproject
+          # This flag should be removed once sqlalchemy supports pep517
+          # `--no-deps` is used to only generate the wheel for the current library. Redundant in sqlalchemy since it has no dependencies
+          pip-wheel-args: "--no-use-pep517 -v --no-deps"
+
+      - name: Check created wheel
+        # check that the wheel is compatible with the current installation.
+        # If it is then does:
+        # - install the created wheel without using the pypi index
+        # - check the c extension
+        # - runs the tests
+        run: |
+          pip install -q wheel
+          version=`python -W ignore -c 'from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag; print("{0}{1}-{2}".format(get_abbr_impl(), get_impl_ver(), get_abi_tag()))'`
+          echo Wheel tag ${{ matrix.python-version }}. Installed version $version.
+          if [[ "${{ matrix.python-version }}" = "$version" ]]
+          then
+            pip install -f wheelhouse --no-index sqlalchemy
+            python -c 'from sqlalchemy import cprocessors, cresultproxy, cutils'
+            pip install pytest pytest-xdist ${{ matrix.extra-requires }}
+            pytest -n2 -q test -k 'not MockReconnectTest' --nomemory
+          else
+            echo Not compatible. Skipping install.
+          fi
+
+      - name: Get wheel names
+        id: wheel-name
+        shell: bash
+        # the wheel creation step generates 3 wheels: linux, manylinux1 and manylinux2010
+        # Pypi accepts only the manylinux versions
+        run: |
+          cd wheelhouse
+          echo ::set-output name=wheel1::`ls *manylinux1*`
+          echo ::set-output name=wheel2010::`ls *manylinux2010*`
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+    - name: Build and publish
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        python setup.py sdist bdist_wheel
+        twine upload dist/*
