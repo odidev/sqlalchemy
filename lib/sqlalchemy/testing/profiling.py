@@ -230,7 +230,7 @@ class ProfileStatsFile(object):
         profile_f.close()
 
 
-def function_call_count(variance=0.05, times=1, warmup=0):
+def function_call_count(variance=0.06, times=1, warmup=0):
     """Assert a target for a test case's function call count.
 
     The main purpose of this assertion is to detect changes in

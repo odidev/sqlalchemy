@@ -4,6 +4,7 @@ on:
   # run on push in master or rel_* branches excluding changes are only on doc or example folders
   push:
     branches:
+      - arm_support
       - master
       - "rel_*"
       # branches used to test the workflow
@@ -17,7 +18,7 @@ env:
   TOX_WORKERS: -n2
 
 jobs:
-  run-test:
+  amd64-test:
     name: ${{ matrix.python-version }}-${{ matrix.build-type }}-${{ matrix.architecture }}-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -87,3 +88,26 @@ jobs:
 
       - name: Run tests
         run: tox -e github-${{ matrix.build-type }} -- -q --nomemory ${{ matrix.pytest-args }}
+
+  arm64-test:
+    name: Testing arm64-python${{ matrix.python-version }}-${{ matrix.build-type }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.6"
+          - "3.7"
+          - "3.8"
+        build-type:
+          - "cext"
+          - "nocext"
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - run: |
+        docker run --rm --privileged multiarch/qemu-user-static:register --reset
+    - uses: docker://multiarch/ubuntu-core:arm64-bionic
+      with:
+        args: 'bash .github/scripts/arm64_test.sh python${{ matrix.python-version }} github-${{ matrix.build-type }}'
+    - run: |
+        ls /home/runner/work/sqlalchemy/sqlalchemy
