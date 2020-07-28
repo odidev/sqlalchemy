@@ -284,3 +284,33 @@ jobs:
         run: |
           pip install -U twine
           twine upload --skip-existing wheelhouse/*manylinux*
+  make-wheel-linux-arm64:
+    name: Arm64 wheel-python${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.6"
+          - "3.7"
+          - "3.8"
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - run: |
+            docker run --rm --privileged hypriot/qemu-register
+    - uses: docker://quay.io/pypa/manylinux2014_aarch64
+      with:
+        args: 'bash .github/scripts/arm64_create_wheels.sh ${{ matrix.python-version }}'
+    - run: |
+        ls /home/runner/work/sqlalchemy/sqlalchemy
+    - uses: actions/setup-python@v1
+      with:
+          python-version: "3.8"
+    - env:
+          TWINE_USERNAME: __token__
+          # replace TWINE_PASSWORD with token for real pypi
+          # TWINE_PASSWORD: ${{ secrets.test_pypi_token }}
+          TWINE_PASSWORD: ${{ secrets.pypi_token }}
+      run: |
+          pip install -U twine
+          twine upload --skip-existing wheelhouse/*
