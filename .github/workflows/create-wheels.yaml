@@ -4,6 +4,7 @@ on:
   # run when a release has been created
   push:
     branches:
+      - test_arm
       - arm_support
       - master
       - "rel_*"
@@ -312,3 +313,15 @@ jobs:
         args: 'bash .github/scripts/arm64_create_wheels.sh python${{ matrix.python-version }}'
     - run: |
         ls /home/runner/work/sqlalchemy/sqlalchemy
+    - uses: actions/setup-python@v1
+      with:
+          python-version: "3.8"
+    - env:   
+          TWINE_USERNAME: odidev
+          # replace TWINE_PASSWORD with token for real pypi
+          # TWINE_PASSWORD: ${{ secrets.test_pypi_token }}
+          TWINE_PASSWORD: pypi-pypi-AgENdGVzdC5weXBpLm9yZwIkOGQ1YjY5OWUtMTM5ZC00YWExLWIxYjgtOGNkMzQxOThiZDg1AAIleyJwZXJtaXNzaW9ucyI6ICJ1c2VyIiwgInZlcnNpb24iOiAxfQAABiDR0VzT9YzHs8X0x7kXHwG0lKpZuKCSeTUM3eHbf6PZAg
+          repository_url: https://test.pypi.org/legacy/
+      run: |
+          pip install -U twine
+          twine upload --skip-existing wheelhouse/*
