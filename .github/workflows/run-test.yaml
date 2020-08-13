@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - arm_support
+      - arm_support_testing 
       - master
       - "rel_*"
       # branches used to test the workflow
