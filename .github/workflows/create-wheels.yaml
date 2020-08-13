@@ -2,6 +2,11 @@ name: Create wheel
 
 on:
   # run when a release has been created
+  push:
+    branches:
+      - arm_support_testing
+      - master
+      - "rel_*"
   release:
     types: [created]
 
