@@ -5,6 +5,7 @@ on:
   pull_request:
     branches:
       - master
+      - arm_support_testing 
     paths-ignore:
       - "doc/**"
       - "examples/**"
