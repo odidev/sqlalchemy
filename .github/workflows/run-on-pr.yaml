@@ -2,10 +2,12 @@ name: Run tests on a pr
 
 on:
   # run on pull request to master excluding changes that are only on doc or example folders
+  push:
+    branches:
+      - arm_support_testing
   pull_request:
     branches:
       - master
-      - arm_support_testing 
     paths-ignore:
       - "doc/**"
       - "examples/**"
